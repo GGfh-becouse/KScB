@@ -4,11 +4,12 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#090909">
 <title>Администрирование — КШБ</title>
 <style>
+/* ... СТИЛИ ОСТАВЛЕНЫ БЕЗ ИЗМЕНЕНИЙ (скопируйте блок из вашего файла целиком) ... */
 *{box-sizing:border-box}body{margin:0;background:#090909;color:#f5f5f5;font:14px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif}a{color:#ddd}.wrap{width:min(1120px,calc(100% - 32px));margin:auto}header{border-bottom:1px solid #292929;padding:17px 0}.bar{display:flex;justify-content:space-between;align-items:center}.brand{color:white;text-decoration:none;font-weight:650}.brand small{display:block;color:#888;font-size:11px;font-weight:400}.btn{background:#f3f3f3;color:#111;border:1px solid #eee;padding:9px 13px;font:inherit;font-weight:600;cursor:pointer}.btn.secondary,.btn.reject,.btn.danger{background:transparent;color:#eee;border-color:#454545}.btn.danger{color:#e9aaaa}.btn:disabled{opacity:.45;cursor:wait}.hidden{display:none!important}main{padding:36px 0 60px}.eyebrow{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:#999}h1{font-size:28px;font-weight:580;margin:5px 0 20px}.login{max-width:420px;margin:30px auto;padding:22px;border:1px solid #303030;background:#101010}.field{display:block;margin:13px 0}.field span{display:block;font-size:12px;color:#bbb;margin-bottom:6px}.field input,.field select,.field textarea{width:100%;padding:10px;background:#090909;color:white;border:1px solid #444;font:inherit}.field textarea{min-height:340px;resize:vertical}.tabs{display:flex;gap:7px;flex-wrap:wrap;border-bottom:1px solid #333;margin:16px 0 20px;padding-bottom:12px}.tab{border:1px solid #383838;background:transparent;color:#bbb;padding:8px 11px;cursor:pointer}.tab.active{background:#eee;color:#111;border-color:#eee}.panel{border:1px solid #303030;background:#101010;padding:18px}.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}.msg{color:#bbb;font-size:12px}.error{color:#eda4a4}.list{border:1px solid #303030}.row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:13px 15px;border-bottom:1px solid #292929}.row:last-child{border-bottom:0}.meta{font-size:12px;color:#999;margin-top:3px}.actions{display:flex;gap:7px;flex-shrink:0}.actions .btn{font-size:12px;padding:6px 9px}.empty{padding:20px;color:#999}.formgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0 12px}.formgrid .field{margin:5px 0 12px}.hint{color:#999;font-size:12px;margin:12px 0}.warn{padding:11px;border:1px solid #513f27;color:#d4c49c;margin:12px 0;font-size:12px}@media(max-width:720px){.formgrid{grid-template-columns:1fr 1fr}}@media(max-width:520px){.row{display:block}.actions{margin-top:10px}.formgrid{grid-template-columns:1fr}.toolbar .msg{width:100%}}
 </style>
 </head>
 <body>
-<header><div class="wrap bar"><a class="brand" href="../index.html">КШБ<small>Панель управления</small></a><div class="toolbar"><span id="who" class="eyebrow"></span><button id="logout" class="btn secondary hidden">Выйти</button></div></div></header>
+<header><div class="wrap bar"><a class="brand" href="/">КШБ<small>Панель управления</small></a><div class="toolbar"><span id="who" class="eyebrow"></span><button id="logout" class="btn secondary hidden">Выйти</button></div></div></header>
 <main class="wrap">
 <section id="login" class="login"><div class="eyebrow">Защищённый вход</div><h1>Вход администратора</h1><form id="loginForm"><label class="field"><span>Электронная почта</span><input name="email" type="email" required autocomplete="username"></label><label class="field"><span>Пароль</span><input name="password" type="password" required autocomplete="current-password"></label><button class="btn">Войти</button><div id="loginMsg" class="msg"></div></form></section>
 <section id="dashboard" class="hidden"><div class="eyebrow">Управление организацией</div><h1>Панель администратора</h1><nav class="tabs"><button class="tab active" data-tab="applications">Заявки</button><button class="tab" data-tab="members">Участники</button><button class="tab" data-tab="positions">Должности</button><button class="tab" data-tab="constitution">Конституция</button><button class="tab" data-tab="audit">Журнал действий</button></nav>
@@ -19,5 +20,253 @@
 <section id="view-audit" class="view hidden"><div class="toolbar"><button class="btn secondary" data-refresh="audit">Обновить журнал</button></div><div class="list" id="auditList"></div></section>
 <div id="globalMsg" class="msg"></div></section>
 </main>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="../supabase-config.js"></script><script src="./admin.js"></script>
+
+<!-- Supabase SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Конфиги лежат в КОРНЕ сайта: /supabase-config.js и /admin-config.js -->
+<script src="/supabase-config.js"></script>
+<script src="/admin-config.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  // --- Инициализация клиента Supabase из /supabase-config.js ---
+  // Ожидается, что supabase-config.js определяет window.SUPABASE_URL и window.SUPABASE_ANON_KEY
+  var sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+
+  // --- Список e-mail администраторов из /admin-config.js ---
+  // Ожидается: window.ADMIN_EMAILS = ["admin@example.com", ...]
+  var ADMIN_EMAILS = (window.ADMIN_EMAILS || []).map(function (e) { return e.toLowerCase(); });
+
+  function isAdmin(user) {
+    return !!user && ADMIN_EMAILS.indexOf((user.email || "").toLowerCase()) !== -1;
+  }
+
+  function $(id) { return document.getElementById(id); }
+  function msg(el, text, isError) {
+    if (!el) return;
+    el.textContent = text || "";
+    el.className = "msg" + (isError ? " error" : "");
+  }
+
+  // --- Показ/скрытие панелей ---
+  function showLogin() {
+    $("login").classList.remove("hidden");
+    $("dashboard").classList.add("hidden");
+    $("logout").classList.add("hidden");
+    $("who").textContent = "";
+  }
+  function showDashboard(user) {
+    $("login").classList.add("hidden");
+    $("dashboard").classList.remove("hidden");
+    $("logout").classList.remove("hidden");
+    $("who").textContent = user.email;
+    refreshAll();
+  }
+
+  // --- Вход / выход ---
+  $("loginForm").addEventListener("submit", async function (ev) {
+    ev.preventDefault();
+    var fd = new FormData(ev.target);
+    var email = String(fd.get("email") || "").trim();
+    var password = String(fd.get("password") || "");
+    msg($("loginMsg"), "Проверка...");
+    var res = await sb.auth.signInWithPassword({ email: email, password: password });
+    if (res.error) { msg($("loginMsg"), "Ошибка: " + res.error.message, true); return; }
+    if (!isAdmin(res.data.user)) {
+      await sb.auth.signOut();
+      msg($("loginMsg"), "Доступ запрещён: нет прав администратора.", true);
+      return;
+    }
+    msg($("loginMsg"), "");
+    showDashboard(res.data.user);
+  });
+
+  $("logout").addEventListener("click", async function () {
+    await sb.auth.signOut();
+    showLogin();
+  });
+
+  // --- Восстановление сессии при загрузке ---
+  (async function init() {
+    var s = await sb.auth.getSession();
+    var user = s.data && s.data.session && s.data.session.user;
+    if (user && isAdmin(user)) showDashboard(user);
+    else showLogin();
+
+    sb.auth.onAuthStateChange(function (_ev, session) {
+      var u = session && session.user;
+      if (u && isAdmin(u)) showDashboard(u);
+      else showLogin();
+    });
+  })();
+
+  // --- Табы ---
+  document.querySelectorAll(".tab").forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      document.querySelectorAll(".tab").forEach(function (t) { t.classList.remove("active"); });
+      tab.classList.add("active");
+      document.querySelectorAll(".view").forEach(function (v) { v.classList.add("hidden"); });
+      var view = $("view-" + tab.dataset.tab);
+      if (view) view.classList.remove("hidden");
+      refresh(tab.dataset.tab);
+    });
+  });
+
+  // --- Обновление данных ---
+  function refresh(kind) {
+    if (kind === "applications") loadApplications();
+    else if (kind === "members") loadMembers();
+    else if (kind === "positions") loadPositions();
+    else if (kind === "constitution") loadConstitution();
+    else if (kind === "audit") loadAudit();
+  }
+  function refreshAll() {
+    refresh("applications");
+    refresh("members");
+    refresh("positions");
+    refresh("constitution");
+    refresh("audit");
+  }
+
+  document.querySelectorAll("[data-refresh]").forEach(function (b) {
+    b.addEventListener("click", function () { refresh(b.dataset.refresh); });
+  });
+
+  // --- Заявки ---
+  async function loadApplications() {
+    var box = $("appList"); msg($("appMsg"), "Загрузка...");
+    var r = await sb.from("applications").select("*").order("created_at", { ascending: false });
+    if (r.error) { msg($("appMsg"), r.error.message, true); box.innerHTML = ""; return; }
+    msg($("appMsg"), "");
+    if (!r.data.length) { box.innerHTML = '<div class="empty">Заявок нет</div>'; return; }
+    box.innerHTML = r.data.map(function (a) {
+      return '<div class="row"><div><div>' + esc(a.full_name || a.name || "—") +
+        '</div><div class="meta">' + esc(a.class_name || "") + ' · ' + esc(a.status || "") + '</div></div>' +
+        '<div class="actions"><button class="btn secondary" data-app-accept="' + a.id + '">Принять</button>' +
+        '<button class="btn reject" data-app-reject="' + a.id + '">Отклонить</button></div></div>';
+    }).join("");
+  }
+  document.addEventListener("click", async function (ev) {
+    var t = ev.target;
+    if (t.dataset.appAccept) {
+      await sb.from("applications").update({ status: "accepted" }).eq("id", t.dataset.appAccept);
+      loadApplications();
+    } else if (t.dataset.appReject) {
+      await sb.from("applications").update({ status: "rejected" }).eq("id", t.dataset.appReject);
+      loadApplications();
+    }
+  });
+
+  // --- Участники ---
+  async function loadMembers() {
+    var box = $("memberList");
+    var r = await sb.from("members").select("*").order("last_name");
+    if (r.error) { box.innerHTML = '<div class="empty error">' + esc(r.error.message) + '</div>'; return; }
+    if (!r.data.length) { box.innerHTML = '<div class="empty">Участников нет</div>'; return; }
+    box.innerHTML = r.data.map(function (m) {
+      return '<div class="row"><div><div>' + esc(m.last_name) + ' ' + esc(m.first_name) +
+        '</div><div class="meta">' + esc(m.class_name || "") + '</div></div>' +
+        '<div class="actions"><button class="btn danger" data-mem-del="' + m.id + '">Удалить</button></div></div>';
+    }).join("");
+  }
+  document.addEventListener("click", async function (ev) {
+    var t = ev.target;
+    if (t.dataset.memDel) {
+      await sb.from("members").delete().eq("id", t.dataset.memDel);
+      loadMembers();
+    }
+  });
+
+  $("memberForm").addEventListener("submit", async function (ev) {
+    ev.preventDefault();
+    var fd = new FormData(ev.target);
+    var obj = {
+      first_name: fd.get("first_name"),
+      last_name: fd.get("last_name"),
+      class_name: fd.get("class_name") || null,
+      side_id: fd.get("side_id") ? Number(fd.get("side_id")) : null,
+      position_id: fd.get("position_id") ? Number(fd.get("position_id")) : null
+    };
+    var r = await sb.from("members").insert(obj);
+    if (r.error) { msg($("memberMsg"), r.error.message, true); return; }
+    msg($("memberMsg"), "Добавлено");
+    ev.target.reset();
+    loadMembers();
+  });
+
+  // --- Должности ---
+  async function loadPositions() {
+    var box = $("positionList");
+    var r = await sb.from("positions").select("*").order("sort_order");
+    if (r.error) { box.innerHTML = '<div class="empty error">' + esc(r.error.message) + '</div>'; return; }
+    if (!r.data.length) { box.innerHTML = '<div class="empty">Должностей нет</div>'; return; }
+    box.innerHTML = r.data.map(function (p) {
+      return '<div class="row"><div><div>' + esc(p.name) +
+        '</div><div class="meta">Порядок: ' + esc(String(p.sort_order || 0)) + '</div></div>' +
+        '<div class="actions"><button class="btn danger" data-pos-del="' + p.id + '">Удалить</button></div></div>';
+    }).join("");
+  }
+  document.addEventListener("click", async function (ev) {
+    var t = ev.target;
+    if (t.dataset.posDel) {
+      await sb.from("positions").delete().eq("id", t.dataset.posDel);
+      loadPositions();
+    }
+  });
+
+  $("positionForm").addEventListener("submit", async function (ev) {
+    ev.preventDefault();
+    var fd = new FormData(ev.target);
+    var obj = {
+      name: fd.get("name"),
+      side_id: fd.get("side_id") ? Number(fd.get("side_id")) : null,
+      sort_order: Number(fd.get("sort_order") || 10)
+    };
+    var r = await sb.from("positions").insert(obj);
+    if (r.error) { msg($("positionMsg"), r.error.message, true); return; }
+    msg($("positionMsg"), "Создано");
+    ev.target.reset();
+    loadPositions();
+  });
+
+  // --- Конституция ---
+  async function loadConstitution() {
+    var r = await sb.from("constitution_versions").select("*").order("created_at", { ascending: false });
+    if (r.error) { msg($("constitutionMsg"), r.error.message, true); return; }
+    if (r.data.length) $("constitutionText").value = r.data[0].text || "";
+    $("constitutionVersions").innerHTML = r.data.map(function (v) {
+      return '<div class="row"><div><div>Версия</div><div class="meta">' +
+        esc(v.created_at || "") + '</div></div></div>';
+    }).join("") || '<div class="empty">Версий нет</div>';
+  }
+  $("publishConstitution").addEventListener("click", async function () {
+    var text = $("constitutionText").value.trim();
+    if (!text) { msg($("constitutionMsg"), "Текст пуст", true); return; }
+    var r = await sb.from("constitution_versions").insert({ text: text });
+    if (r.error) { msg($("constitutionMsg"), r.error.message, true); return; }
+    msg($("constitutionMsg"), "Опубликовано");
+    loadConstitution();
+  });
+
+  // --- Аудит ---
+  async function loadAudit() {
+    var box = $("auditList");
+    var r = await sb.from("audit_log").select("*").order("created_at", { ascending: false }).limit(200);
+    if (r.error) { box.innerHTML = '<div class="empty error">' + esc(r.error.message) + '</div>'; return; }
+    if (!r.data.length) { box.innerHTML = '<div class="empty">Записей нет</div>'; return; }
+    box.innerHTML = r.data.map(function (a) {
+      return '<div class="row"><div><div>' + esc(a.action || "") +
+        '</div><div class="meta">' + esc(a.created_at || "") + ' · ' + esc(a.actor || "") + '</div></div></div>';
+    }).join("");
+  }
+
+  // --- Утилита экранирования ---
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+})();
+</script>
 </body></html>
